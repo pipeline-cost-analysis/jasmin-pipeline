@@ -1,0 +1,41 @@
+#!/bin/bash
+
+# set -x
+trap "exit" INT
+
+OPTION="-pipeline -branchpredictor"
+OPTIONNAIVE="-pipeline -branchpredictor -naivepipeline"
+MAXJOBS="3"
+
+declare -A SUBDIRS
+
+SUBDIRS[simple-examples/array-len.jazz]=""
+SUBDIRS[simple-examples/array-len2.jazz]=""
+SUBDIRS[simple-examples/fe25519_mul.jazz]=""
+SUBDIRS[simple-examples/hw.jazz]=""
+SUBDIRS[simple-examples/nolea.jazz]=""
+
+SUBDIRS[simple-examples/loop3.jazz]="-safetyparam RDI,RSI;RDX" # out,in;inlen
+SUBDIRS[simple-examples/opti.jazz]="-safetyparam ;RDX" # ;len
+SUBDIRS[simple-examples/nonopti.jazz]="-safetyparam ;RDX" # ;len
+
+CURJOBS=0
+for i in "${!SUBDIRS[@]}"; do
+  # If true, wait until the next background job finishes to continue.
+  ((cur_jobs >= MAXJOBS)) && wait -n
+  echo "Starting analysis of ${i}"
+  (../jasminc ${OPTION} ${SUBDIRS[$i]} ${i} &> ${i}.cost ;
+   echo "=> Done ${i}, results" 
+  ) & ((++cur_jobs))
+done
+
+for i in "${!SUBDIRS[@]}"; do
+  # If true, wait until the next background job finishes to continue.
+  ((cur_jobs >= MAXJOBS)) && wait -n
+  echo "Starting analysis of ${i} (naive)"
+  (../jasminc ${OPTIONNAIVE} ${SUBDIRS[$i]} ${i} &> ${i}.cost_naive ;
+   echo "=> Done ${i}, results" 
+  ) & ((++cur_jobs))
+done
+
+wait

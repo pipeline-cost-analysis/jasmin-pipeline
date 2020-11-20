@@ -1,0 +1,39 @@
+#!/bin/bash
+
+# set -x
+trap "exit" INT
+
+OPTION="-pipeline -branchpredictor"
+OPTIONNAIVE="-pipeline -branchpredictor -naivepipeline"
+MAXJOBS="3"
+
+declare -A SUBDIRS
+
+SUBDIRS[poly1305/ref3/poly1305.japp]="-safetyparam RSI,RDI;RDX" # in,out;inlen
+SUBDIRS[poly1305/avx2/poly1305.japp]="-safetyparam RSI,RDI;RDX" # in,out;inlen
+
+SUBDIRS[chacha20/ref/chacha20.jazz]="-safetyparam RDI,RSI;RDX" # output,plain;len
+SUBDIRS[chacha20/avx2/chacha20.jazz]="-safetyparam RDI,RSI;RDX" # output,plain;len
+
+SUBDIRS[aes/aes-ctr-alt.jazz]="-safetyparam RSI,RDX;RCX" # inp,outp;len
+
+CURJOBS=0
+for i in "${!SUBDIRS[@]}"; do
+  # If true, wait until the next background job finishes to continue.
+  ((cur_jobs >= MAXJOBS)) && wait -n
+  echo "Starting analysis of ${i}"
+  (../jasminc ${OPTION} ${SUBDIRS[$i]} ${i} &> ${i}.cost ;
+   echo "=> Done ${i}, results" 
+  ) & ((++cur_jobs))
+done
+
+for i in "${!SUBDIRS[@]}"; do
+  # If true, wait until the next background job finishes to continue.
+  ((cur_jobs >= MAXJOBS)) && wait -n
+  echo "Starting analysis of ${i} (naive)"
+  (../jasminc ${OPTIONNAIVE} ${SUBDIRS[$i]} ${i} &> ${i}.cost_naive ;
+   echo "=> Done ${i}, results" 
+  ) & ((++cur_jobs))
+done
+
+wait
